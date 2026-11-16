@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相撲 決まり手マッチングクイズ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Hiragino Kana', 'Noto Sans JP', sans-serif; }
+  .flip-card { perspective: 800px; }
+  .option-btn:focus { outline: 3px solid #d97706; outline-offset: 2px; }
+  .correct-flash { animation: flashGreen 0.5s ease; }
+  .wrong-flash { animation: flashRed 0.5s ease; }
+  @keyframes flashGreen { 0%,100%{background-color:inherit} 50%{background-color:#bbf7d0} }
+  @keyframes flashRed { 0%,100%{background-color:inherit} 50%{background-color:#fecaca} }
+  .cat-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:0.75rem; font-weight:700; }
+</style>
+</head>
+<body class="bg-amber-50 min-h-screen">
+
+<header class="bg-red-800 text-white py-4 px-4 shadow-lg">
+  <div class="max-w-2xl mx-auto flex items-center gap-3">
+    <span class="text-3xl" aria-hidden="true">🏆</span>
+    <div>
+      <h1 class="text-xl font-bold">相撲 決まり手マッチングクイズ</h1>
+      <p class="text-red-200 text-sm">82種の決まり手を学ぼう</p>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto p-4" id="app">
+
+  <!-- Home Screen -->
+  <div id="screen-home">
+    <div class="bg-white rounded-2xl shadow p-6 mt-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4">クイズモードを選択</h2>
+      <div class="space-y-3">
+        <button id="btn-mode1" class="w-full bg-red-700 hover:bg-red-800 text-white py-3 px-4 rounded-xl font-bold text-left flex items-center gap-3 transition">
+          <span class="text-2xl" aria-hidden="true">📖</span>
+          <div>
+            <div class="font-bold">技名 → 説明</div>
+            <div class="text-red-200 text-sm">技名を見て正しい説明を選ぶ</div>
+          </div>
+        </button>
+        <button id="btn-mode2" class="w-full bg-orange-700 hover:bg-orange-800 text-white py-3 px-4 rounded-xl font-bold text-left flex items-center gap-3 transition">
+          <span class="text-2xl" aria-hidden="true">🔍</span>
+          <div>
+            <div class="font-bold">説明 → 技名</div>
+            <div class="text-orange-200 text-sm">説明文を見て技名を選ぶ</div>
+          </div>
+        </button>
+        <button id="btn-mode3" class="w-full bg-yellow-700 hover:bg-yellow-800 text-white py-3 px-4 rounded-xl font-bold text-left flex items-center gap-3 transition">
+          <span class="text-2xl" aria-hidden="true">🗂️</span>
+          <div>
+            <div class="font-bold">カテゴリー問題</div>
+            <div class="text-yellow-200 text-sm">この技はどのカテゴリー？</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="bg-white rounded-2xl shadow p-5 mt-4">
+      <h2 class="text-base font-bold text-gray-700 mb-3">カテゴリー別正答率</h2>
+      <div id="stats-display" class="space-y-2"></div>
+    </div>
+
+    <!-- Best Score -->
+    <div class="bg-white rounded-2xl shadow p-4 mt-4 flex justify-between items-center">
+      <div>
+        <div class="text-sm text-gray-500">ベストスコア</div>
+        <div id="best-score-display" class="text-2xl font-bold text-red-700">-</div>
+      </div>
+      <div>
+        <div class="text-sm text-gray-500">最長ストリーク</div>
+        <div id="best-streak-display" class="text-2xl font-bold text-orange-600">-</div>
+      </div>
+      <button id="btn-reset-stats" class="text-xs text-gray-400 hover:text-red-600 underline">リセット</button>
+    </div>
+  </div>
+
+  <!-- Quiz Screen -->
+  <div id="screen-quiz" class="hidden">
+    <div class="mt-4 flex items-center justify-between mb-3">
+      <button id="btn-quit" class="text-sm text-red-700 hover:underline font-bold">← ホームへ</button>
+      <div class="flex items-center gap-4 text-sm">
+        <span class="text-gray-600">問 <span id="q-num" class="font-bold text-gray-800">1</span>/10</span>
+        <span class="text-orange-600 font-bold">🔥 <span id="streak-count">0</span></span>
+        <span class="text-green-700 font-bold">✓ <span id="correct-count">0</span></span>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="bg-gray-200 rounded-full h-2 mb-4">
+      <div id="progress-bar" class="bg-red-600 h-2 rounded-full transition-all" style="width:0%"></div>
+    </div>
+
+    <div id="quiz-card" class="bg-white rounded-2xl shadow p-5">
+      <div class="mb-1">
+        <span id="mode-label" class="text-xs font-semibold text-gray-500 uppercase tracking-wide"></span>
+      </div>
+      <div id="question-text" class="text-lg font-bold text-gray-900 mb-5 leading-relaxed"></div>
+      <div id="options-container" class="space-y-2" role="list"></div>
+    </div>
+
+    <!-- Explanation -->
+    <div id="explanation-box" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mt-3">
+      <div class="font-bold text-blue-900 mb-1" id="exp-title"></div>
+      <p id="exp-desc" class="text-sm text-blue-800 mb-2"></p>
+      <p id="exp-wrestler" class="text-xs text-blue-600 italic"></p>
+      <button id="btn-next" class="mt-3 bg-red-700 hover:bg-red-800 text-white py-2 px-5 rounded-lg font-bold text-sm">次の問題 →</button>
+    </div>
+  </div>
+
+  <!-- Result Screen -->
+  <div id="screen-result" class="hidden">
+    <div class="bg-white rounded-2xl shadow p-6 mt-4 text-center">
+      <div id="result-emoji" class="text-5xl mb-2">🏆</div>
+      <div id="result-title" class="text-xl font-bold text-gray-800 mb-1"></div>
+      <div id="result-score" class="text-4xl font-bold text-red-700 mb-4"></div>
+      <div id="result-streak" class="text-sm text-gray-600 mb-5"></div>
+      <button id="btn-replay" class="bg-red-700 hover:bg-red-800 text-white py-2 px-6 rounded-xl font-bold mr-2">もう一度</button>
+      <button id="btn-home-result" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-6 rounded-xl font-bold">ホームへ</button>
+    </div>
+    <div id="result-category-breakdown" class="bg-white rounded-2xl shadow p-5 mt-4"></div>
+  </div>
+
+</main>
+
+<script>
+const KIMARITE = [
+  // 押し/寄り
+  { name:'押し出し', cat:'押し/寄り', desc:'両手または片手で相手を押し、土俵外に出す技。最も基本的な決まり手。', wrestler:'白鵬（速攻の押し出しで多くの勝利）' },
+  { name:'寄り切り', cat:'押し/寄り', desc:'まわしを取りながら相手を土俵際に追い詰め、外に出す。横綱の代名詞的技。', wrestler:'北の湖（磐石の寄り切り）' },
+  { name:'押し倒し', cat:'押し/寄り', desc:'相手を後ろ向きに押しながら倒す技。', wrestler:'琴奨菊（突進力のある押し倒し）' },
+  { name:'寄り倒し', cat:'押し/寄り', desc:'まわしを取りながら前に出て、相手を倒す。', wrestler:'鶴竜（丁寧な寄り倒し）' },
+  { name:'突き出し', cat:'押し/寄り', desc:'両手でのど輪や胸元を突いて相手を土俵外へ出す技。', wrestler:'逸ノ城（強力な突き出し）' },
+  { name:'突き倒し', cat:'押し/寄り', desc:'突きの勢いで相手を土俵内で倒す技。', wrestler:'栃煌山（鋭い突き倒し）' },
+  // 投げ
+  { name:'上手投げ', cat:'投げ', desc:'まわしの上手（上から取った手）を使って相手を前に投げ倒す。', wrestler:'千代の富士（伝説の上手投げ）' },
+  { name:'下手投げ', cat:'投げ', desc:'まわしの下手（下から取った手）を使って相手を外側に投げる。', wrestler:'魁皇（破壊力抜群の下手投げ）' },
+  { name:'外掛け', cat:'投げ', desc:'相手の足の外側に自分の足を引っかけて転ばせる技。', wrestler:'大鵬（外掛けの名人）' },
+  { name:'内掛け', cat:'投げ', desc:'相手の足の内側に足をかけて転ばせる技。', wrestler:'舞の海（小兵力士が多用）' },
+  { name:'つり出し', cat:'投げ', desc:'まわしを取って相手を持ち上げ、土俵外に運び出す豪快な技。', wrestler:'小錦（怪力のつり出し）' },
+  { name:'つり落とし', cat:'投げ', desc:'相手を持ち上げ、そのまま土俵内に落として倒す。', wrestler:'武蔵丸（大型力士のつり落とし）' },
+  { name:'上手出し投げ', cat:'投げ', desc:'上手を引き寄せながら前方に引き落とす投げ技。', wrestler:'白鵬（柔軟な技の一つ）' },
+  { name:'下手出し投げ', cat:'投げ', desc:'下手を利かせながら前に引き出して投げる技。', wrestler:'魁皇（多彩な下手技）' },
+  // 掛け
+  { name:'足取り', cat:'掛け', desc:'相手の足首や膝を取り、前後に引いて倒す技。', wrestler:'舞の海（電撃の足取り）' },
+  { name:'蹴返し', cat:'掛け', desc:'相手の踏み出した足を外側から蹴り返す技。', wrestler:'高見山（大型力士の蹴返し）' },
+  { name:'蹴倒し', cat:'掛け', desc:'相手の前脚を蹴りながら前方に倒す技。', wrestler:'栃錦（技巧派の蹴倒し）' },
+  { name:'切り返し', cat:'掛け', desc:'相手の攻めをいなしながら逆方向に技をかける返し技。', wrestler:'輪島（切り返しの名人）' },
+  // 引き
+  { name:'引き落とし', cat:'引き', desc:'相手の攻めをかわしながら頭や肩を押し下げて倒す技。', wrestler:'日馬富士（素早い引き落とし）' },
+  { name:'叩き込み', cat:'引き', desc:'相手の頭や肩を上から叩きつけながら前に倒す技。', wrestler:'稀勢の里（強烈な叩き込み）' },
+  { name:'突き落とし', cat:'引き', desc:'突いてくる相手を横にいなして落とす技。', wrestler:'妙義龍（俊敏な突き落とし）' },
+  { name:'送り出し', cat:'引き', desc:'相手の背後に回り込み、後ろから押し出す技。', wrestler:'豪栄道（機敏な送り出し）' },
+  { name:'送り倒し', cat:'引き', desc:'背後から相手を押さえながら前に倒す技。', wrestler:'正代（丁寧な送り倒し）' },
+  { name:'送りつり出し', cat:'引き', desc:'背後からまわしを引いて持ち上げ、土俵外に出す技。', wrestler:'曙（大型力士の力業）' },
+  // 特殊
+  { name:'上手捻り', cat:'捻り', desc:'上手を取りながら相手を捻るように横に倒す技。', wrestler:'栃東（技巧の捻り）' },
+  { name:'下手捻り', cat:'捻り', desc:'下手を利かせて相手を捻って倒す技。', wrestler:'魁皇（下手技のバリエーション）' },
+  { name:'首投げ', cat:'投げ', desc:'相手の首に腕を回して前方に投げ倒す技。', wrestler:'三重ノ海（豪快な首投げ）' },
+  { name:'腕捻り', cat:'捻り', desc:'相手の腕を取って捻り倒す技。', wrestler:'十両力士に多い技術的な技' },
+  { name:'肩透かし', cat:'引き', desc:'相手の攻めを肩でかわして横に落とす技。', wrestler:'舞の海（身軽な肩透かし）' },
+  { name:'居反り', cat:'特殊', desc:'自分が反り返りながら相手を持ち上げて倒す珍しい技。', wrestler:'三段目力士に時折見られる' },
+  { name:'掬い投げ', cat:'投げ', desc:'両腕を下から相手の体に差し込んで持ち上げるように投げる技。', wrestler:'出島（豪快な掬い投げ）' },
+  { name:'外無双', cat:'特殊', desc:'相手の外側に腕を回し体を引いて転ばせる技。', wrestler:'舞の海（外無双の達人）' },
+  { name:'内無双', cat:'特殊', desc:'相手の内側に手を入れながら転ばせる技。', wrestler:'増健（技巧派の内無双）' },
+  { name:'二丁投げ', cat:'特殊', desc:'相手の膝裏に自分の足をかけながら投げる複合技。', wrestler:'小兵力士に見られる奇襲技' },
+  { name:'河津掛け', cat:'掛け', desc:'相手の内股に自分の脚を絡めて後ろに倒す技。', wrestler:'初代若乃花（河津掛けの名手）' },
+  { name:'外掛け', cat:'掛け', desc:'相手の外足に自分の足を引っかけて、相手を後方に倒す。', wrestler:'大鵬（外掛けを得意とした横綱）' },
+  { name:'まきかえ', cat:'特殊', desc:'相手の上手をはずして自分が上手を取り直す動作から生まれる決まり手。', wrestler:'北勝海（巧みなまきかえ）' },
+  { name:'外たすき反り', cat:'特殊', desc:'相手の腕を取りながら反り身になる珍技。まれにしか出ない。', wrestler:'伝説的な珍しい決まり手' },
+  { name:'決まり手なし', cat:'特殊', desc:'行司の差し違えや勝負不成立など、明確な決まり手が判定されない場合。', wrestler:'行司差し違えや物言いの結果' },
+  { name:'徳俵', cat:'特殊', desc:'徳俵（俵が1個離れた位置）を利用してかわし相手を倒す体勢から決まる技。', wrestler:'珍しい体勢から生まれる技' },
+  { name:'合掌捻り', cat:'捻り', desc:'両手を合わせるように相手の体を包んで捻り倒す技。', wrestler:'技巧派力士に見られる' },
+];
+
+const CATEGORIES = [...new Set(KIMARITE.map(k=>k.cat))];
+const CAT_COLORS = {
+  '押し/寄り':'bg-red-100 text-red-800',
+  '投げ':'bg-blue-100 text-blue-800',
+  '掛け':'bg-green-100 text-green-800',
+  '引き':'bg-yellow-100 text-yellow-800',
+  '捻り':'bg-purple-100 text-purple-800',
+  '特殊':'bg-gray-100 text-gray-800',
+};
+
+let currentMode = 1;
+let questions = [];
+let currentQ = 0;
+let correctCount = 0;
+let streak = 0;
+let bestStreak = 0;
+let answeredThisQ = false;
+let sessionCatResults = {};
+
+function getStats() {
+  return JSON.parse(localStorage.getItem('sumo_stats') || '{}');
+}
+function saveStats(s) { localStorage.setItem('sumo_stats', JSON.stringify(s)); }
+
+function getBest() {
+  return JSON.parse(localStorage.getItem('sumo_best') || '{"score":0,"streak":0}');
+}
+function saveBest(b) { localStorage.setItem('sumo_best', JSON.stringify(b)); }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function getWrongOptions(correct, field, count) {
+  const others = shuffle(KIMARITE.filter(k => k[field] !== correct[field]));
+  return others.slice(0, count).map(k => k[field]);
+}
+
+function generateQuestions(mode) {
+  const pool = shuffle(KIMARITE).slice(0, 10);
+  return pool.map(item => {
+    if (mode === 1) {
+      // name -> desc
+      const wrongs = getWrongOptions(item, 'desc', 3);
+      const opts = shuffle([item.desc, ...wrongs]);
+      return { item, questionText: item.name, questionLabel:'この技の説明は？', options: opts, correct: item.desc, type:'desc' };
+    } else if (mode === 2) {
+      // desc -> name
+      const wrongs = getWrongOptions(item, 'name', 3);
+      const opts = shuffle([item.name, ...wrongs]);
+      return { item, questionText: item.desc, questionLabel:'この説明の技名は？', options: opts, correct: item.name, type:'name' };
+    } else {
+      // name -> category
+      const otherCats = shuffle(CATEGORIES.filter(c => c !== item.cat)).slice(0,3);
+      const opts = shuffle([item.cat, ...otherCats]);
+      return { item, questionText: item.name, questionLabel:'この技のカテゴリーは？', options: opts, correct: item.cat, type:'cat' };
+    }
+  });
+}
+
+function renderStats() {
+  const stats = getStats();
+  const el = document.getElementById('stats-display');
+  el.innerHTML = '';
+  if (Object.keys(stats).length === 0) {
+    const p = document.createElement('p');
+    p.className = 'text-sm text-gray-400';
+    p.textContent = 'まだデータがありません。クイズに挑戦しよう！';
+    el.appendChild(p);
+    return;
+  }
+  for (const cat of CATEGORIES) {
+    if (!stats[cat]) continue;
+    const { correct, total } = stats[cat];
+    const pct = Math.round(correct/total*100);
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    const badge = document.createElement('span');
+    badge.className = `cat-badge ${CAT_COLORS[cat] || 'bg-gray-100 text-gray-800'}`;
+    badge.textContent = cat;
+    const bar = document.createElement('div');
+    bar.className = 'flex-1 bg-gray-100 rounded-full h-3';
+    const fill = document.createElement('div');
+    fill.className = 'bg-red-500 h-3 rounded-full transition-all';
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    const pctEl = document.createElement('span');
+    pctEl.className = 'text-xs text-gray-600 w-10 text-right';
+    pctEl.textContent = pct + '%';
+    row.appendChild(badge);
+    row.appendChild(bar);
+    row.appendChild(pctEl);
+    el.appendChild(row);
+  }
+}
+
+function renderBest() {
+  const best = getBest();
+  const scoreEl = document.getElementById('best-score-display');
+  const streakEl = document.getElementById('best-streak-display');
+  scoreEl.textContent = best.score > 0 ? best.score + '/10' : '-';
+  streakEl.textContent = best.streak > 0 ? best.streak + '連勝' : '-';
+}
+
+function showScreen(id) {
+  ['screen-home','screen-quiz','screen-result'].forEach(s => {
+    document.getElementById(s).classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function startQuiz(mode) {
+  currentMode = mode;
+  questions = generateQuestions(mode);
+  currentQ = 0;
+  correctCount = 0;
+  streak = 0;
+  bestStreak = 0;
+  answeredThisQ = false;
+  sessionCatResults = {};
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = questions[currentQ];
+  document.getElementById('q-num').textContent = currentQ + 1;
+  document.getElementById('streak-count').textContent = streak;
+  document.getElementById('correct-count').textContent = correctCount;
+  document.getElementById('progress-bar').style.width = (currentQ / 10 * 100) + '%';
+  document.getElementById('mode-label').textContent = q.questionLabel;
+  const qText = document.getElementById('question-text');
+  qText.textContent = '';
+  // Category badge
+  if (currentMode !== 3) {
+    const badge = document.createElement('span');
+    badge.className = `cat-badge ${CAT_COLORS[q.item.cat] || 'bg-gray-100 text-gray-800'} mr-2`;
+    badge.textContent = q.item.cat;
+    qText.appendChild(badge);
+    qText.appendChild(document.createTextNode(' '));
+  }
+  qText.appendChild(document.createTextNode(q.questionText));
+
+  const container = document.getElementById('options-container');
+  container.innerHTML = '';
+  document.getElementById('explanation-box').classList.add('hidden');
+  answeredThisQ = false;
+
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn w-full text-left bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl py-3 px-4 text-sm font-medium text-gray-800 transition';
+    btn.setAttribute('role', 'listitem');
+    btn.textContent = opt;
+    btn.dataset.index = i;
+    btn.addEventListener('click', () => handleAnswer(btn, opt, q));
+    container.appendChild(btn);
+  });
+}
+
+function handleAnswer(btn, chosen, q) {
+  if (answeredThisQ) return;
+  answeredThisQ = true;
+  const isCorrect = chosen === q.correct;
+
+  if (isCorrect) {
+    btn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
+    btn.classList.remove('bg-amber-50', 'border-amber-200');
+    correctCount++;
+    streak++;
+    if (streak > bestStreak) bestStreak = streak;
+  } else {
+    btn.classList.add('bg-red-100', 'border-red-400', 'text-red-800');
+    btn.classList.remove('bg-amber-50', 'border-amber-200');
+    streak = 0;
+    // show correct
+    const opts = document.querySelectorAll('.option-btn');
+    opts.forEach(b => {
+      if (b.textContent === q.correct) {
+        b.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
+        b.classList.remove('bg-amber-50', 'border-amber-200');
+      }
+    });
+  }
+  document.querySelectorAll('.option-btn').forEach(b => { b.disabled = true; });
+  document.getElementById('correct-count').textContent = correctCount;
+  document.getElementById('streak-count').textContent = streak;
+
+  // Update category stats
+  const cat = q.item.cat;
+  if (!sessionCatResults[cat]) sessionCatResults[cat] = { correct:0, total:0 };
+  sessionCatResults[cat].total++;
+  if (isCorrect) sessionCatResults[cat].correct++;
+
+  // Show explanation
+  const expBox = document.getElementById('explanation-box');
+  document.getElementById('exp-title').textContent = q.item.name + '（' + q.item.cat + '）';
+  document.getElementById('exp-desc').textContent = q.item.desc;
+  document.getElementById('exp-wrestler').textContent = '有名力士: ' + q.item.wrestler;
+  expBox.classList.remove('hidden');
+}
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= 10) {
+    endQuiz();
+  } else {
+    renderQuestion();
+  }
+}
+
+function endQuiz() {
+  // Save stats
+  const stats = getStats();
+  for (const [cat, res] of Object.entries(sessionCatResults)) {
+    if (!stats[cat]) stats[cat] = { correct:0, total:0 };
+    stats[cat].correct += res.correct;
+    stats[cat].total += res.total;
+  }
+  saveStats(stats);
+
+  // Update best
+  const best = getBest();
+  if (correctCount > best.score) best.score = correctCount;
+  if (bestStreak > best.streak) best.streak = bestStreak;
+  saveBest(best);
+
+  // Show result
+  const pct = correctCount / 10;
+  const emojis = ['😢','😕','🙂','😊','🎉'];
+  const eIdx = Math.min(Math.floor(pct * 5), 4);
+  const titles = ['もっと稽古が必要です','だいぶわかってきた！','なかなか良い成績！','素晴らしい！','完璧！横綱級！'];
+  document.getElementById('result-emoji').textContent = emojis[eIdx];
+  document.getElementById('result-title').textContent = titles[eIdx];
+  document.getElementById('result-score').textContent = correctCount + ' / 10';
+  document.getElementById('result-streak').textContent = '最長ストリーク: ' + bestStreak + '連勝';
+
+  // Category breakdown
+  const breakdown = document.getElementById('result-category-breakdown');
+  breakdown.innerHTML = '';
+  const h = document.createElement('h3');
+  h.className = 'font-bold text-gray-700 mb-3';
+  h.textContent = 'カテゴリー別結果';
+  breakdown.appendChild(h);
+  for (const [cat, res] of Object.entries(sessionCatResults)) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 mb-2';
+    const badge = document.createElement('span');
+    badge.className = `cat-badge ${CAT_COLORS[cat] || 'bg-gray-100 text-gray-800'}`;
+    badge.textContent = cat;
+    const score = document.createElement('span');
+    score.className = 'text-sm text-gray-700';
+    score.textContent = res.correct + '/' + res.total + '問正解';
+    row.appendChild(badge);
+    row.appendChild(score);
+    breakdown.appendChild(row);
+  }
+
+  showScreen('screen-result');
+  renderStats();
+  renderBest();
+}
+
+// Event Listeners
+document.getElementById('btn-mode1').addEventListener('click', () => startQuiz(1));
+document.getElementById('btn-mode2').addEventListener('click', () => startQuiz(2));
+document.getElementById('btn-mode3').addEventListener('click', () => startQuiz(3));
+document.getElementById('btn-quit').addEventListener('click', () => { showScreen('screen-home'); renderStats(); renderBest(); });
+document.getElementById('btn-next').addEventListener('click', nextQuestion);
+document.getElementById('btn-replay').addEventListener('click', () => startQuiz(currentMode));
+document.getElementById('btn-home-result').addEventListener('click', () => { showScreen('screen-home'); renderStats(); renderBest(); });
+document.getElementById('btn-reset-stats').addEventListener('click', () => {
+  if (confirm('統計データをリセットしますか？')) {
+    localStorage.removeItem('sumo_stats');
+    localStorage.removeItem('sumo_best');
+    renderStats();
+    renderBest();
+  }
+});
+
+// Init
+renderStats();
+renderBest();
+</script>
+</body>
+</html>
